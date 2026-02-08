@@ -1,4 +1,5 @@
 import { db } from "../db/db";
+import type { SetLog } from "../db/db";
 import { useState, useEffect } from "react";
 import RestTimer from "../components/RestTimer";
 
@@ -25,7 +26,26 @@ export default function AddSetPage() {
   // Rest timer
   const [showTimer, setShowTimer] = useState(false);
 
-  // ⭐ AUTO‑CARRYOVER — load last set when exercise name changes
+  // Live workout log
+  const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [currentWorkoutId, setCurrentWorkoutId] = useState<number | null>(null);
+
+  // Group sets by exercise
+  function groupSetsByExercise(sets: SetLog[]) {
+    const groups: Record<string, SetLog[]> = {};
+
+    sets.forEach((set) => {
+      if (!groups[set.exercise]) {
+        groups[set.exercise] = [];
+      }
+      groups[set.exercise].push(set);
+    });
+
+    return groups;
+  }
+
+  // Auto‑carryover
   useEffect(() => {
     if (exercise.trim().length < 2) return;
 
@@ -47,7 +67,29 @@ export default function AddSetPage() {
     loadLast();
   }, [exercise]);
 
-  // ⭐ SAVE SET
+  // Load today's workout + sets
+  useEffect(() => {
+    async function loadWorkout() {
+      const today = new Date().toISOString().split("T")[0];
+
+      const workout = await db.workouts.where("date").equals(today).first();
+
+      if (workout) {
+        setCurrentWorkoutId(workout.id!);
+
+        const sets = await db.sets
+          .where("workoutId")
+          .equals(workout.id!)
+          .toArray();
+
+        setCurrentSets(sets);
+      }
+    }
+
+    loadWorkout();
+  }, []);
+
+  // Save set
   async function addSet() {
     if (!exercise) return;
 
@@ -63,6 +105,7 @@ export default function AddSetPage() {
         finished: false
       });
       workout = { id, date: today, type: workoutType, finished: false };
+      setCurrentWorkoutId(id);
     }
 
     // Save the set
@@ -76,6 +119,14 @@ export default function AddSetPage() {
       time,
       date: new Date().toISOString()
     });
+
+    // Refresh visible sets
+    const updated = await db.sets
+      .where("workoutId")
+      .equals(workout.id!)
+      .toArray();
+
+    setCurrentSets(updated);
 
     // Reset inputs
     setExercise("");
@@ -91,6 +142,46 @@ export default function AddSetPage() {
   return (
     <div style={{ padding: 20 }}>
       <h2 style={{ marginBottom: 20 }}>Add Set</h2>
+
+      {/* ⭐ GROUPED WORKOUT SETS */}
+      <div style={{ marginBottom: 20 }}>
+        {Object.entries(groupSetsByExercise(currentSets)).map(([exerciseName, sets]) => (
+          <div key={exerciseName} style={{ marginBottom: 20 }}>
+            
+            {/* Exercise Header */}
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: 18,
+                marginBottom: 8,
+                color: "var(--white)"
+              }}
+            >
+              {exerciseName}
+            </div>
+
+            {/* Sets under this exercise */}
+            {sets.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  background: "var(--grey-dark)",
+                  padding: 10,
+                  marginBottom: 6,
+                  borderRadius: 6,
+                  border: "1px solid var(--grey-border)",
+                  color: "var(--white)"
+                }}
+              >
+                {s.weight !== undefined && `${s.weight}kg `}
+                {s.reps !== undefined && `× ${s.reps}`}
+                {s.distance !== undefined && `${s.distance}m `}
+                {s.time !== undefined && `${s.time}s `}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
 
       {/* Workout Type Selector */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>

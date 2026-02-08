@@ -24,18 +24,27 @@ export interface Plan {
   exercises: string[];
 }
 
+// NEW: Notebook interface
+export interface Notes {
+  id: number;
+  text: string;
+}
+
 class KeepLiftingDB extends Dexie {
   workouts!: Dexie.Table<Workout, number>;
   sets!: Dexie.Table<SetLog, number>;
   plans!: Dexie.Table<Plan, string>;
+  notes!: Dexie.Table<Notes, number>; // NEW
 
   constructor() {
     super("KeepLiftingDB");
 
-    this.version(2).stores({
+    // Bump version 2 → 3 to add notes table
+    this.version(3).stores({
       workouts: "++id, date, type, finished",
       sets: "++id, workoutId, category, date",
-      plans: "key"
+      plans: "key",
+      notes: "id" // NEW
     });
   }
 }
