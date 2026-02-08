@@ -32,7 +32,7 @@ class KeepLiftingDB extends Dexie {
   constructor() {
     super("KeepLiftingDB");
 
-    this.version(1).stores({
+    this.version(2).stores({
       workouts: "++id, date, type, finished",
       sets: "++id, workoutId, category, date",
       plans: "key"
