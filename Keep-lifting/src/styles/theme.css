@@ -1,0 +1,14 @@
+:root {
+  --black: #000000;
+  --white: #ffffff;
+  --red: #cc0000;
+  --grey-dark: #1a1a1a;
+  --grey-border: #2a2a2a;
+}
+
+body {
+  margin: 0;
+  background: var(--black);
+  color: var(--white);
+  font-family: Arial, sans-serif;
+}
