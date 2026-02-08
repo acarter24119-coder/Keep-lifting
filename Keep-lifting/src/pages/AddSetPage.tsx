@@ -9,7 +9,8 @@ const inputStyle: React.CSSProperties = {
   marginBottom: "10px",
   background: "var(--grey-dark)",
   color: "var(--white)",
-  border: "1px solid var(--grey-border)"
+  border: "1px solid var(--grey-border)",
+  fontSize: "16px" // ⭐ Prevents iPhone zoom
 };
 
 export default function AddSetPage() {
@@ -28,24 +29,21 @@ export default function AddSetPage() {
 
   // Live workout log
   const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
+
   // @ts-ignore: currentWorkoutId will be used in future features
   const [currentWorkoutId, setCurrentWorkoutId] = useState<number | null>(null);
 
-  // Group sets by exercise
+  // ⭐ Group sets by exercise
   function groupSetsByExercise(sets: SetLog[]) {
     const groups: Record<string, SetLog[]> = {};
-
     sets.forEach((set) => {
-      if (!groups[set.exercise]) {
-        groups[set.exercise] = [];
-      }
+      if (!groups[set.exercise]) groups[set.exercise] = [];
       groups[set.exercise].push(set);
     });
-
     return groups;
   }
 
-  // Auto‑carryover
+  // ⭐ Auto‑carryover
   useEffect(() => {
     if (exercise.trim().length < 2) return;
 
@@ -67,11 +65,10 @@ export default function AddSetPage() {
     loadLast();
   }, [exercise]);
 
-  // Load today's workout + sets
+  // ⭐ Load today's workout + sets
   useEffect(() => {
     async function loadWorkout() {
       const today = new Date().toISOString().split("T")[0];
-
       const workout = await db.workouts.where("date").equals(today).first();
 
       if (workout) {
@@ -89,13 +86,11 @@ export default function AddSetPage() {
     loadWorkout();
   }, []);
 
-  // Save set
+  // ⭐ Save set
   async function addSet() {
     if (!exercise) return;
 
     const today = new Date().toISOString().split("T")[0];
-
-    // Find or create today's workout
     let workout = await db.workouts.where("date").equals(today).first();
 
     if (!workout) {
@@ -108,7 +103,6 @@ export default function AddSetPage() {
       setCurrentWorkoutId(id);
     }
 
-    // Save the set
     await db.sets.add({
       workoutId: workout.id!,
       category,
@@ -120,7 +114,6 @@ export default function AddSetPage() {
       date: new Date().toISOString()
     });
 
-    // Refresh visible sets
     const updated = await db.sets
       .where("workoutId")
       .equals(workout.id!)
@@ -128,60 +121,18 @@ export default function AddSetPage() {
 
     setCurrentSets(updated);
 
-    // Reset inputs
     setExercise("");
     setWeight(undefined);
     setReps(undefined);
     setDistance(undefined);
     setTime(undefined);
 
-    // Show rest timer
     setShowTimer(true);
   }
 
   return (
     <div style={{ padding: 20 }}>
       <h2 style={{ marginBottom: 20 }}>Add Set</h2>
-
-      {/* ⭐ GROUPED WORKOUT SETS */}
-      <div style={{ marginBottom: 20 }}>
-        {Object.entries(groupSetsByExercise(currentSets)).map(([exerciseName, sets]) => (
-          <div key={exerciseName} style={{ marginBottom: 20 }}>
-            
-            {/* Exercise Header */}
-            <div
-              style={{
-                fontWeight: "bold",
-                fontSize: 18,
-                marginBottom: 8,
-                color: "var(--white)"
-              }}
-            >
-              {exerciseName}
-            </div>
-
-            {/* Sets under this exercise */}
-            {sets.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  background: "var(--grey-dark)",
-                  padding: 10,
-                  marginBottom: 6,
-                  borderRadius: 6,
-                  border: "1px solid var(--grey-border)",
-                  color: "var(--white)"
-                }}
-              >
-                {s.weight !== undefined && `${s.weight}kg `}
-                {s.reps !== undefined && `× ${s.reps}`}
-                {s.distance !== undefined && `${s.distance}m `}
-                {s.time !== undefined && `${s.time}s `}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
 
       {/* Workout Type Selector */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
@@ -325,6 +276,43 @@ export default function AddSetPage() {
       >
         Add Set
       </button>
+
+      {/* ⭐ GROUPED WORKOUT SETS (moved under Add Set button) */}
+      <div style={{ marginTop: 20 }}>
+        {Object.entries(groupSetsByExercise(currentSets)).map(([exerciseName, sets]) => (
+          <div key={exerciseName} style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: 18,
+                marginBottom: 8,
+                color: "var(--white)"
+              }}
+            >
+              {exerciseName}
+            </div>
+
+            {sets.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  background: "var(--grey-dark)",
+                  padding: 10,
+                  marginBottom: 6,
+                  borderRadius: 6,
+                  border: "1px solid var(--grey-border)",
+                  color: "var(--white)"
+                }}
+              >
+                {s.weight !== undefined && `${s.weight}kg `}
+                {s.reps !== undefined && `× ${s.reps}`}
+                {s.distance !== undefined && `${s.distance}m `}
+                {s.time !== undefined && `${s.time}s `}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
 
       {/* Rest Timer */}
       {showTimer && (
