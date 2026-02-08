@@ -28,7 +28,7 @@ export default function AddSetPage() {
 
   // Live workout log
   const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-ignore: currentWorkoutId will be used in future features
   const [currentWorkoutId, setCurrentWorkoutId] = useState<number | null>(null);
 
   // Group sets by exercise
