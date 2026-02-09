@@ -379,7 +379,7 @@ export default function AddSetPage() {
       {/* Rest Timer */}
       {showTimer && (
         <RestTimer
-          seconds={30}
+          seconds={60}
           onClose={() => setShowTimer(false)}
         />
       )}
