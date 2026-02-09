@@ -30,21 +30,29 @@ export interface Notes {
   text: string;
 }
 
+// NEW: Exercise list interface
+export interface ExerciseName {
+  id?: number;
+  name: string;
+}
+
 class KeepLiftingDB extends Dexie {
   workouts!: Dexie.Table<Workout, number>;
   sets!: Dexie.Table<SetLog, number>;
   plans!: Dexie.Table<Plan, string>;
-  notes!: Dexie.Table<Notes, number>; // NEW
+  notes!: Dexie.Table<Notes, number>;
+  exercises!: Dexie.Table<ExerciseName, number>; // NEW
 
   constructor() {
     super("KeepLiftingDB");
 
-    // Bump version 2 → 3 to add notes table
-    this.version(3).stores({
+    // Bump version 3 → 4 to add exercises table
+    this.version(4).stores({
       workouts: "++id, date, type, finished",
       sets: "++id, workoutId, category, date",
       plans: "key",
-      notes: "id" // NEW
+      notes: "id",
+      exercises: "++id, name" // NEW
     });
   }
 }

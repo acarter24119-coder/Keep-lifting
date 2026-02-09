@@ -10,7 +10,7 @@ const inputStyle: React.CSSProperties = {
   background: "var(--grey-dark)",
   color: "var(--white)",
   border: "1px solid var(--grey-border)",
-  fontSize: "16px" // ⭐ Prevents iPhone zoom
+  fontSize: "16px"
 };
 
 export default function AddSetPage() {
@@ -30,8 +30,22 @@ export default function AddSetPage() {
   // Live workout log
   const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
 
-  // @ts-ignore: currentWorkoutId will be used in future features
+  // @ts-ignore
   const [currentWorkoutId, setCurrentWorkoutId] = useState<number | null>(null);
+
+  // ⭐ NEW — Recent exercises
+  const [recentExercises, setRecentExercises] = useState<string[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // ⭐ Load last 15 exercises
+  useEffect(() => {
+    db.exercises
+      .orderBy("id")
+      .reverse()
+      .limit(15)
+      .toArray()
+      .then(list => setRecentExercises(list.map(e => e.name)));
+  }, []);
 
   // ⭐ Group sets by exercise
   function groupSetsByExercise(sets: SetLog[]) {
@@ -114,6 +128,16 @@ export default function AddSetPage() {
       date: new Date().toISOString()
     });
 
+    // ⭐ NEW — Auto‑save exercise name
+    const exists = await db.exercises.where("name").equals(exercise).first();
+    if (!exists) {
+      await db.exercises.add({ name: exercise });
+
+      // Refresh recent list
+      const list = await db.exercises.orderBy("id").reverse().limit(15).toArray();
+      setRecentExercises(list.map(e => e.name));
+    }
+
     const updated = await db.sets
       .where("workoutId")
       .equals(workout.id!)
@@ -175,14 +199,52 @@ export default function AddSetPage() {
         ))}
       </div>
 
-      {/* Exercise Input */}
-      <input
-        type="text"
-        placeholder="Exercise"
-        value={exercise}
-        onChange={(e) => setExercise(e.target.value)}
-        style={inputStyle}
-      />
+      {/* ⭐ Exercise Input + Dropdown */}
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          placeholder="Exercise"
+          value={exercise}
+          onChange={(e) => setExercise(e.target.value)}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+          style={inputStyle}
+        />
+
+        {showDropdown && recentExercises.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              background: "white",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              zIndex: 10,
+              maxHeight: "200px",
+              overflowY: "auto"
+            }}
+          >
+            {recentExercises.map((ex) => (
+              <div
+                key={ex}
+                onMouseDown={() => {
+                  setExercise(ex);
+                  setShowDropdown(false);
+                }}
+                style={{
+                  padding: "8px",
+                  cursor: "pointer",
+                  borderBottom: "1px solid #eee"
+                }}
+              >
+                {ex}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Dynamic Inputs */}
       {category === "strength" && (
@@ -277,7 +339,7 @@ export default function AddSetPage() {
         Add Set
       </button>
 
-      {/* ⭐ GROUPED WORKOUT SETS (moved under Add Set button) */}
+      {/* Grouped Sets */}
       <div style={{ marginTop: 20 }}>
         {Object.entries(groupSetsByExercise(currentSets)).map(([exerciseName, sets]) => (
           <div key={exerciseName} style={{ marginBottom: 20 }}>
@@ -317,7 +379,7 @@ export default function AddSetPage() {
       {/* Rest Timer */}
       {showTimer && (
         <RestTimer
-          seconds={90}
+          seconds={30}
           onClose={() => setShowTimer(false)}
         />
       )}
