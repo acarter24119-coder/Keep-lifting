@@ -29,18 +29,17 @@ export default function AddSetPage() {
   const [recentExercises, setRecentExercises] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Templates
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
 
-  // Template creation modal
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateExercises, setTemplateExercises] = useState<string[]>([]);
   const [templateExercise, setTemplateExercise] = useState("");
   const [templateShowDropdown, setTemplateShowDropdown] = useState(false);
 
-  // Queue of exercises when a template is loaded
+  const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
+
   const [templateQueue, setTemplateQueue] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -65,7 +64,6 @@ export default function AddSetPage() {
     return groups;
   }
 
-  // Auto-progression when exercise or category changes
   useEffect(() => {
     if (!exercise.trim()) return;
 
@@ -169,7 +167,6 @@ export default function AddSetPage() {
 
     setCurrentSets(updated);
 
-    // Clear inputs
     setExercise("");
     setWeight(undefined);
     setReps(undefined);
@@ -178,7 +175,6 @@ export default function AddSetPage() {
 
     setShowTimer(true);
 
-    // If a template queue is active, move to next exercise
     if (templateQueue && templateQueue.length > 0) {
       const [, ...rest] = templateQueue;
       if (rest.length > 0) {
@@ -190,7 +186,6 @@ export default function AddSetPage() {
     }
   }
 
-  // Load a template: set up queue and start with first exercise
   function loadTemplate(template: Template) {
     if (!template.exercises || template.exercises.length === 0) return;
 
@@ -199,7 +194,15 @@ export default function AddSetPage() {
     setExercise(template.exercises[0]);
   }
 
-  // Template creation helpers
+  function startEditingTemplate(t: Template) {
+    setEditingTemplateId(t.id!);
+    setTemplateName(t.name);
+    setTemplateExercises(t.exercises);
+    setTemplateExercise("");
+    setShowTemplateMenu(false);
+    setShowCreateTemplate(true);
+  }
+
   function addExerciseToTemplate() {
     const name = templateExercise.trim();
     if (!name) return;
@@ -211,10 +214,17 @@ export default function AddSetPage() {
     const name = templateName.trim();
     if (!name || templateExercises.length === 0) return;
 
-    await db.templates.add({
-      name,
-      exercises: templateExercises
-    });
+    if (editingTemplateId) {
+      await db.templates.update(editingTemplateId, {
+        name,
+        exercises: templateExercises
+      });
+    } else {
+      await db.templates.add({
+        name,
+        exercises: templateExercises
+      });
+    }
 
     const all = await db.templates.toArray();
     setTemplates(all);
@@ -222,12 +232,11 @@ export default function AddSetPage() {
     setTemplateName("");
     setTemplateExercises([]);
     setTemplateExercise("");
+    setEditingTemplateId(null);
     setShowCreateTemplate(false);
   }
-
-  return (
+return (
     <div style={{ padding: 20 }}>
-      {/* Template menu */}
       {showTemplateMenu && (
         <div
           style={{
@@ -258,22 +267,45 @@ export default function AddSetPage() {
             )}
 
             {templates.map((t) => (
-              <button
+              <div
                 key={t.id}
                 style={{
-                  width: "100%",
-                  padding: 10,
-                  marginBottom: 8,
-                  background: "var(--grey-dark)",
-                  color: "var(--white)",
-                  border: "1px solid var(--grey-border)",
-                  textAlign: "left",
-                  cursor: "pointer"
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8
                 }}
-                onClick={() => loadTemplate(t)}
               >
-                {t.name}
-              </button>
+                <button
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    background: "var(--grey-dark)",
+                    color: "var(--white)",
+                    border: "1px solid var(--grey-border)",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    marginRight: 10
+                  }}
+                  onClick={() => loadTemplate(t)}
+                >
+                  {t.name}
+                </button>
+
+                <button
+                  style={{
+                    padding: "8px 12px",
+                    background: "transparent",
+                    color: "var(--white)",
+                    border: "1px solid var(--grey-border)",
+                    cursor: "pointer",
+                    fontSize: 14
+                  }}
+                  onClick={() => startEditingTemplate(t)}
+                >
+                  Edit
+                </button>
+              </div>
             ))}
 
             <button
@@ -287,6 +319,10 @@ export default function AddSetPage() {
                 cursor: "pointer"
               }}
               onClick={() => {
+                setEditingTemplateId(null);
+                setTemplateName("");
+                setTemplateExercises([]);
+                setTemplateExercise("");
                 setShowTemplateMenu(false);
                 setShowCreateTemplate(true);
               }}
@@ -312,7 +348,6 @@ export default function AddSetPage() {
         </div>
       )}
 
-      {/* Template creation modal */}
       {showCreateTemplate && (
         <div
           style={{
@@ -334,7 +369,9 @@ export default function AddSetPage() {
               maxWidth: 400
             }}
           >
-            <h3 style={{ color: "var(--white)", marginBottom: 10 }}>Create Template</h3>
+            <h3 style={{ color: "var(--white)", marginBottom: 10 }}>
+              {editingTemplateId ? "Edit Template" : "Create Template"}
+            </h3>
 
             <input
               type="text"
@@ -479,6 +516,7 @@ export default function AddSetPage() {
                 setTemplateName("");
                 setTemplateExercises([]);
                 setTemplateExercise("");
+                setEditingTemplateId(null);
               }}
             >
               Cancel
@@ -486,8 +524,7 @@ export default function AddSetPage() {
           </div>
         </div>
       )}
-
-      <h2 style={{ marginBottom: 20 }}>Add Set</h2>
+<h2 style={{ marginBottom: 20 }}>Add Set</h2>
 
       <button
         style={{
@@ -725,4 +762,4 @@ export default function AddSetPage() {
       )}
     </div>
   );
-}
+}        
