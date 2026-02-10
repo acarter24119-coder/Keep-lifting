@@ -25,7 +25,7 @@ export default function AddSetPage() {
 
   const [showTimer, setShowTimer] = useState(false);
   const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
-  const [currentWorkoutId, setCurrentWorkoutId] = useState<number | null>(null);
+
 
   const [recentExercises, setRecentExercises] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -75,7 +75,7 @@ export default function AddSetPage() {
       const workout = await db.workouts.where("date").equals(today).first();
 
       if (workout) {
-        setCurrentWorkoutId(workout.id!);
+       
 
         const sets = await db.sets
           .where("workoutId")
@@ -102,7 +102,7 @@ export default function AddSetPage() {
         finished: false
       });
       workout = { id, date: today, type: workoutType, finished: false };
-      setCurrentWorkoutId(id);
+      
     }
 
     await db.sets.add({
