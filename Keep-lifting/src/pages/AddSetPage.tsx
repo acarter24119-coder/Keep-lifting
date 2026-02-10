@@ -1,6 +1,6 @@
-import { db } from "../db/db";
-import type { SetLog } from "../db/db";
 import { useState, useEffect } from "react";
+import type { SetLog, Template } from "../db/db";
+import { db } from "../db/db";
 import RestTimer from "../components/RestTimer";
 
 const inputStyle: React.CSSProperties = {
@@ -26,9 +26,22 @@ export default function AddSetPage() {
   const [showTimer, setShowTimer] = useState(false);
   const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
 
-
   const [recentExercises, setRecentExercises] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // Templates
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+
+  // Template creation modal
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateExercises, setTemplateExercises] = useState<string[]>([]);
+  const [templateExercise, setTemplateExercise] = useState("");
+  const [templateShowDropdown, setTemplateShowDropdown] = useState(false);
+
+  // Queue of exercises when a template is loaded
+  const [templateQueue, setTemplateQueue] = useState<string[] | null>(null);
 
   useEffect(() => {
     db.exercises
@@ -37,6 +50,10 @@ export default function AddSetPage() {
       .limit(15)
       .toArray()
       .then(list => setRecentExercises(list.map(e => e.name)));
+  }, []);
+
+  useEffect(() => {
+    db.templates.toArray().then(setTemplates);
   }, []);
 
   function groupSetsByExercise(sets: SetLog[]) {
@@ -48,10 +65,11 @@ export default function AddSetPage() {
     return groups;
   }
 
+  // Auto-progression when exercise or category changes
   useEffect(() => {
-    if (exercise.trim().length < 2) return;
+    if (!exercise.trim()) return;
 
-    async function loadLast() {
+    async function loadProgression() {
       const last = await db.sets
         .where("exercise")
         .equalsIgnoreCase(exercise.trim())
@@ -60,14 +78,37 @@ export default function AddSetPage() {
 
       if (!last) return;
 
-      if (last.weight !== undefined) setWeight(last.weight);
-      if (last.reps !== undefined) setReps(last.reps);
-      if (last.distance !== undefined) setDistance(last.distance);
-      if (last.time !== undefined) setTime(last.time);
+      if (category === "strength") {
+        setWeight((last.weight ?? 0) + 2.5);
+        setReps(last.reps ?? 5);
+        setDistance(undefined);
+        setTime(undefined);
+      }
+
+      if (category === "carry") {
+        setWeight((last.weight ?? 0) + 5);
+        setDistance(last.distance ?? 20);
+        setReps(undefined);
+        setTime(undefined);
+      }
+
+      if (category === "hold") {
+        setWeight(last.weight ?? 0);
+        setTime((last.time ?? 20) + 5);
+        setReps(undefined);
+        setDistance(undefined);
+      }
+
+      if (category === "cardio") {
+        setTime((last.time ?? 60) + 10);
+        setDistance(last.distance ?? 1);
+        setWeight(undefined);
+        setReps(undefined);
+      }
     }
 
-    loadLast();
-  }, [exercise]);
+    loadProgression();
+  }, [exercise, category]);
 
   useEffect(() => {
     async function loadWorkout() {
@@ -75,8 +116,6 @@ export default function AddSetPage() {
       const workout = await db.workouts.where("date").equals(today).first();
 
       if (workout) {
-       
-
         const sets = await db.sets
           .where("workoutId")
           .equals(workout.id!)
@@ -102,7 +141,6 @@ export default function AddSetPage() {
         finished: false
       });
       workout = { id, date: today, type: workoutType, finished: false };
-      
     }
 
     await db.sets.add({
@@ -131,6 +169,7 @@ export default function AddSetPage() {
 
     setCurrentSets(updated);
 
+    // Clear inputs
     setExercise("");
     setWeight(undefined);
     setReps(undefined);
@@ -138,11 +177,332 @@ export default function AddSetPage() {
     setTime(undefined);
 
     setShowTimer(true);
+
+    // If a template queue is active, move to next exercise
+    if (templateQueue && templateQueue.length > 0) {
+      const [, ...rest] = templateQueue;
+      if (rest.length > 0) {
+        setExercise(rest[0]);
+        setTemplateQueue(rest);
+      } else {
+        setTemplateQueue(null);
+      }
+    }
+  }
+
+  // Load a template: set up queue and start with first exercise
+  function loadTemplate(template: Template) {
+    if (!template.exercises || template.exercises.length === 0) return;
+
+    setShowTemplateMenu(false);
+    setTemplateQueue(template.exercises);
+    setExercise(template.exercises[0]);
+  }
+
+  // Template creation helpers
+  function addExerciseToTemplate() {
+    const name = templateExercise.trim();
+    if (!name) return;
+    setTemplateExercises(prev => [...prev, name]);
+    setTemplateExercise("");
+  }
+
+  async function saveTemplate() {
+    const name = templateName.trim();
+    if (!name || templateExercises.length === 0) return;
+
+    await db.templates.add({
+      name,
+      exercises: templateExercises
+    });
+
+    const all = await db.templates.toArray();
+    setTemplates(all);
+
+    setTemplateName("");
+    setTemplateExercises([]);
+    setTemplateExercise("");
+    setShowCreateTemplate(false);
   }
 
   return (
     <div style={{ padding: 20 }}>
+      {/* Template menu */}
+      {showTemplateMenu && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100
+          }}
+        >
+          <div
+            style={{
+              background: "var(--grey-dark)",
+              padding: 20,
+              borderRadius: 8,
+              width: "90%",
+              maxWidth: 400
+            }}
+          >
+            <h3 style={{ color: "var(--white)", marginBottom: 10 }}>Load Template</h3>
+
+            {templates.length === 0 && (
+              <div style={{ color: "var(--white)", marginBottom: 10 }}>
+                No templates yet. Create one first.
+              </div>
+            )}
+
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  marginBottom: 8,
+                  background: "var(--grey-dark)",
+                  color: "var(--white)",
+                  border: "1px solid var(--grey-border)",
+                  textAlign: "left",
+                  cursor: "pointer"
+                }}
+                onClick={() => loadTemplate(t)}
+              >
+                {t.name}
+              </button>
+            ))}
+
+            <button
+              style={{
+                width: "100%",
+                padding: 10,
+                marginTop: 10,
+                background: "var(--grey-dark)",
+                color: "var(--white)",
+                border: "1px solid var(--grey-border)",
+                cursor: "pointer"
+              }}
+              onClick={() => {
+                setShowTemplateMenu(false);
+                setShowCreateTemplate(true);
+              }}
+            >
+              Create New Template
+            </button>
+
+            <button
+              style={{
+                width: "100%",
+                padding: 10,
+                marginTop: 10,
+                background: "var(--red)",
+                color: "var(--white)",
+                border: "none",
+                cursor: "pointer"
+              }}
+              onClick={() => setShowTemplateMenu(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Template creation modal */}
+      {showCreateTemplate && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 110
+          }}
+        >
+          <div
+            style={{
+              background: "var(--grey-dark)",
+              padding: 20,
+              borderRadius: 8,
+              width: "90%",
+              maxWidth: 400
+            }}
+          >
+            <h3 style={{ color: "var(--white)", marginBottom: 10 }}>Create Template</h3>
+
+            <input
+              type="text"
+              placeholder="Template name (e.g. Events Day)"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              style={inputStyle}
+            />
+
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                placeholder="Exercise"
+                value={templateExercise}
+                onChange={(e) => setTemplateExercise(e.target.value)}
+                onFocus={() => setTemplateShowDropdown(true)}
+                onBlur={() => setTimeout(() => setTemplateShowDropdown(false), 150)}
+                style={inputStyle}
+              />
+
+              {templateShowDropdown && recentExercises.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    background: "var(--grey-dark)",
+                    border: "1px solid var(--grey-border)",
+                    borderRadius: "4px",
+                    zIndex: 10,
+                    maxHeight: "200px",
+                    overflowY: "auto"
+                  }}
+                >
+                  {recentExercises.map((ex) => (
+                    <div
+                      key={ex}
+                      onMouseDown={() => {
+                        setTemplateExercise(ex);
+                        setTemplateShowDropdown(false);
+                      }}
+                      style={{
+                        padding: "8px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid var(--grey-border)",
+                        color: "var(--white)"
+                      }}
+                    >
+                      {ex}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              style={{
+                width: "100%",
+                padding: 10,
+                marginBottom: 10,
+                background: "var(--grey-dark)",
+                color: "var(--white)",
+                border: "1px solid var(--grey-border)",
+                cursor: "pointer"
+              }}
+              onClick={addExerciseToTemplate}
+            >
+              Add Exercise to Template
+            </button>
+
+            {templateExercises.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  maxHeight: 150,
+                  overflowY: "auto",
+                  border: "1px solid var(--grey-border)",
+                  borderRadius: 4,
+                  padding: 8
+                }}
+              >
+                {templateExercises.map((ex, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      color: "var(--white)",
+                      marginBottom: 4,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}
+                  >
+                    <span>{idx + 1}. {ex}</span>
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--red)",
+                        cursor: "pointer"
+                      }}
+                      onClick={() =>
+                        setTemplateExercises(prev =>
+                          prev.filter((_, i) => i !== idx)
+                        )
+                      }
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              style={{
+                width: "100%",
+                padding: 10,
+                marginTop: 5,
+                background: "var(--red)",
+                color: "var(--white)",
+                border: "none",
+                cursor: "pointer"
+              }}
+              onClick={saveTemplate}
+            >
+              Save Template
+            </button>
+
+            <button
+              style={{
+                width: "100%",
+                padding: 10,
+                marginTop: 10,
+                background: "var(--grey-dark)",
+                color: "var(--white)",
+                border: "1px solid var(--grey-border)",
+                cursor: "pointer"
+              }}
+              onClick={() => {
+                setShowCreateTemplate(false);
+                setTemplateName("");
+                setTemplateExercises([]);
+                setTemplateExercise("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <h2 style={{ marginBottom: 20 }}>Add Set</h2>
+
+      <button
+        style={{
+          width: "100%",
+          padding: 12,
+          marginBottom: 20,
+          background: "var(--grey-dark)",
+          color: "var(--white)",
+          border: "1px solid var(--grey-border)",
+          cursor: "pointer"
+        }}
+        onClick={() => setShowTemplateMenu(true)}
+      >
+        Load / Create Template
+      </button>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         {["A", "B", "C", "D", "E"].map((t) => (
@@ -348,7 +708,7 @@ export default function AddSetPage() {
                 }}
               >
                 {s.weight !== undefined && `${s.weight}kg `}
-                {s.reps !== undefined && `× ${s.reps}`}
+                {s.reps !== undefined && `× ${s.reps} `}
                 {s.distance !== undefined && `${s.distance}m `}
                 {s.time !== undefined && `${s.time}s `}
               </div>
