@@ -17,27 +17,19 @@ export default function AddSetPage() {
   const [workoutType, setWorkoutType] = useState<"A" | "B" | "C" | "D" | "E">("A");
   const [category, setCategory] = useState<"strength" | "carry" | "hold" | "cardio">("strength");
 
-  // Inputs
   const [exercise, setExercise] = useState("");
   const [weight, setWeight] = useState<number | undefined>(undefined);
   const [reps, setReps] = useState<number | undefined>(undefined);
   const [distance, setDistance] = useState<number | undefined>(undefined);
   const [time, setTime] = useState<number | undefined>(undefined);
 
-  // Rest timer
   const [showTimer, setShowTimer] = useState(false);
-
-  // Live workout log
   const [currentSets, setCurrentSets] = useState<SetLog[]>([]);
-
-  // @ts-ignore
   const [currentWorkoutId, setCurrentWorkoutId] = useState<number | null>(null);
 
-  // ⭐ NEW — Recent exercises
   const [recentExercises, setRecentExercises] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // ⭐ Load last 15 exercises
   useEffect(() => {
     db.exercises
       .orderBy("id")
@@ -47,7 +39,6 @@ export default function AddSetPage() {
       .then(list => setRecentExercises(list.map(e => e.name)));
   }, []);
 
-  // ⭐ Group sets by exercise
   function groupSetsByExercise(sets: SetLog[]) {
     const groups: Record<string, SetLog[]> = {};
     sets.forEach((set) => {
@@ -57,7 +48,6 @@ export default function AddSetPage() {
     return groups;
   }
 
-  // ⭐ Auto‑carryover
   useEffect(() => {
     if (exercise.trim().length < 2) return;
 
@@ -79,7 +69,6 @@ export default function AddSetPage() {
     loadLast();
   }, [exercise]);
 
-  // ⭐ Load today's workout + sets
   useEffect(() => {
     async function loadWorkout() {
       const today = new Date().toISOString().split("T")[0];
@@ -100,9 +89,8 @@ export default function AddSetPage() {
     loadWorkout();
   }, []);
 
-  // ⭐ Save set
   async function addSet() {
-    if (!exercise) return;
+    if (!exercise.trim()) return;
 
     const today = new Date().toISOString().split("T")[0];
     let workout = await db.workouts.where("date").equals(today).first();
@@ -128,12 +116,10 @@ export default function AddSetPage() {
       date: new Date().toISOString()
     });
 
-    // ⭐ NEW — Auto‑save exercise name
     const exists = await db.exercises.where("name").equals(exercise).first();
     if (!exists) {
       await db.exercises.add({ name: exercise });
 
-      // Refresh recent list
       const list = await db.exercises.orderBy("id").reverse().limit(15).toArray();
       setRecentExercises(list.map(e => e.name));
     }
@@ -158,7 +144,6 @@ export default function AddSetPage() {
     <div style={{ padding: 20 }}>
       <h2 style={{ marginBottom: 20 }}>Add Set</h2>
 
-      {/* Workout Type Selector */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         {["A", "B", "C", "D", "E"].map((t) => (
           <button
@@ -178,7 +163,6 @@ export default function AddSetPage() {
         ))}
       </div>
 
-      {/* Category Selector */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         {["strength", "carry", "hold", "cardio"].map((c) => (
           <button
@@ -199,7 +183,6 @@ export default function AddSetPage() {
         ))}
       </div>
 
-      {/* ⭐ Exercise Input + Dropdown */}
       <div style={{ position: "relative" }}>
         <input
           type="text"
@@ -218,8 +201,8 @@ export default function AddSetPage() {
               top: "100%",
               left: 0,
               right: 0,
-              background: "white",
-              border: "1px solid #ccc",
+              background: "var(--grey-dark)",
+              border: "1px solid var(--grey-border)",
               borderRadius: "4px",
               zIndex: 10,
               maxHeight: "200px",
@@ -236,7 +219,8 @@ export default function AddSetPage() {
                 style={{
                   padding: "8px",
                   cursor: "pointer",
-                  borderBottom: "1px solid #eee"
+                  borderBottom: "1px solid var(--grey-border)",
+                  color: "var(--white)"
                 }}
               >
                 {ex}
@@ -246,7 +230,6 @@ export default function AddSetPage() {
         )}
       </div>
 
-      {/* Dynamic Inputs */}
       {category === "strength" && (
         <>
           <input
@@ -323,7 +306,6 @@ export default function AddSetPage() {
         </>
       )}
 
-      {/* Add Set Button */}
       <button
         onClick={addSet}
         style={{
@@ -339,7 +321,6 @@ export default function AddSetPage() {
         Add Set
       </button>
 
-      {/* Grouped Sets */}
       <div style={{ marginTop: 20 }}>
         {Object.entries(groupSetsByExercise(currentSets)).map(([exerciseName, sets]) => (
           <div key={exerciseName} style={{ marginBottom: 20 }}>
@@ -376,7 +357,6 @@ export default function AddSetPage() {
         ))}
       </div>
 
-      {/* Rest Timer */}
       {showTimer && (
         <RestTimer
           seconds={60}

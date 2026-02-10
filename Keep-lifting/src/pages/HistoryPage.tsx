@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { db } from "../db/db";
+import type { Workout } from "../db/db";
 
 export default function HistoryPage() {
-  const [workouts, setWorkouts] = useState<any[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -12,7 +13,7 @@ export default function HistoryPage() {
         .reverse()
         .toArray();
 
-      setWorkouts(all);
+      setWorkouts(all as Workout[]);
       setLoading(false);
     }
 
@@ -20,7 +21,7 @@ export default function HistoryPage() {
   }, []);
 
   if (loading) {
-    return <div style={{ padding: 20 }}>Loading…</div>;
+    return <div style={{ padding: 20, color: "var(--white)" }}>Loading…</div>;
   }
 
   return (
@@ -36,21 +37,27 @@ export default function HistoryPage() {
       {workouts.map((w) => (
         <div
           key={w.id}
-          onClick={() => window.location.href = `/workout/${w.id}`}
+          onClick={() => (window.location.href = `/workout/${w.id}`)}
           style={{
             padding: 12,
             marginBottom: 10,
             background: "var(--grey-dark)",
             border: "1px solid var(--grey-border)",
-            borderRadius: 4,
+            borderRadius: 6,
             cursor: "pointer"
           }}
         >
-          <div style={{ fontWeight: "bold", color: "var(--red)" }}>
+          <div
+            style={{
+              fontWeight: "bold",
+              color: "var(--red)",
+              marginBottom: 4
+            }}
+          >
             {w.date} — Workout {w.type}
           </div>
 
-          <div style={{ color: "var(--white)", marginTop: 5 }}>
+          <div style={{ color: "var(--white)" }}>
             {w.finished ? "Finished" : "In Progress"}
           </div>
         </div>
